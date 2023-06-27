@@ -8,13 +8,12 @@ import zipfile
 
 import aiohttp
 
-base_url = "http://buildbot.libretro.com/nightly"
-os_type = "windows/x86_64"
+target_url = "http://buildbot.libretro.com/nightly/android/latest/arm64-v8a/"
 out_path = "./download"
 
 
 async def fetch(session, url, data=None):
-    async with session.post(url, data=data) if data is not None else session.get(url) as response:
+    async with session.post(url, data=data) if not data is None else session.get(url) as response:
         return await response.text()
 
 
@@ -41,15 +40,15 @@ async def download_file(session, url, file_path):
 async def main():
     connector = aiohttp.TCPConnector(ssl=False)  # 防止ssl报错
     async with aiohttp.ClientSession(connector=connector) as session:
-        url = os.path.join(base_url, os_type, "latest/?")
+        parsed_uri = urllib.parse.urlparse(target_url)
         data = {
             "action": "get",
             "items": {
-                "href": os.path.join("/nightly", os_type, "latest/"),
+                "href": parsed_uri.path,
                 "what": 1
             }
         }
-        content = await fetch(session, url, json.dumps(data))
+        content = await fetch(session, target_url, json.dumps(data))
         result = json.loads(content)
         items = result["items"]
 
@@ -61,13 +60,13 @@ async def main():
             "apple/osx": ".dylib.zip",
             "apple/ios": ".dylib.zip",
         }
-        key = next(v for v in suffix_map.keys() if os_type.startswith(v))
+
+        key = next(v for v in suffix_map.keys() if target_url.__contains__(v))
         suffix = suffix_map[key]
         items = map(lambda v: v["href"], items)
         items = filter(lambda v: v.endswith(suffix), items)
         items = list(items)
 
-        parsed_uri = urllib.parse.urlparse(base_url)
         local_base_url = '{uri.scheme}://{uri.netloc}/'.format(uri=parsed_uri)
 
         tmp_path = "./tmp"
